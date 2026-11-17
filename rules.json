@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "players": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["state"]
+    },
+    "boards": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
