@@ -53,6 +53,41 @@ body{
 @keyframes floaty{0%,100%{transform:translateY(0) rotate(0deg);}50%{transform:translateY(-10px) rotate(6deg);}}
 #app{position:relative;z-index:1;}
 #app{max-width:760px;margin:0 auto;padding:14px 14px 60px;min-height:100vh;display:flex;flex-direction:column;}
+
+/* ===== 配信側PC用 1080x1920 縦長画角（?role=admin で body.admin-pc のとき適用） ===== */
+body.admin-pc{background:#0e1512;}
+body.admin-pc #app{
+  width:1080px;height:1920px;max-width:none;
+  padding:48px 60px 80px;margin:0 auto;
+  box-sizing:border-box;
+}
+body.admin-pc .card{border-radius:28px;padding:36px;}
+body.admin-pc .title-jp{font-size:44px;}
+body.admin-pc .sub-jp{font-size:20px;}
+body.admin-pc .btn{font-size:26px;padding:22px;border-radius:18px;}
+body.admin-pc .btn.big-cta{font-size:30px;padding:26px;}
+body.admin-pc .count-num{font-size:220px;}
+body.admin-pc .theme-box{font-size:28px;padding:28px;border-radius:20px;}
+body.admin-pc .theme-title{font-size:20px;}
+body.admin-pc .chat{min-height:420px;border-radius:30px;}
+body.admin-pc .chat-bubble{font-size:24px;padding:16px 22px;border-radius:18px;}
+body.admin-pc .chat-line .av{width:52px;height:52px;font-size:26px;}
+body.admin-pc .score-chip{font-size:17px;padding:4px 16px;}
+body.admin-pc .label{font-size:20px;}
+body.admin-pc .hint{font-size:16px;}
+body.admin-pc .topic-item{font-size:22px;padding:22px;border-radius:20px;}
+body.admin-pc .topic-item .t-no{font-size:16px;}
+body.admin-pc .speed-line{font-size:24px;}
+body.admin-pc .acc-big{font-size:44px;}
+body.admin-pc .score-big{font-size:64px;}
+body.admin-pc .pct-unit{font-size:18px;}
+body.admin-pc .next-user-card{padding:24px;border-radius:20px;}
+body.admin-pc .win-name{font-size:56px;}
+body.admin-pc .win-score{font-size:28px;}
+body.admin-pc .win-name + .win-score{font-size:28px;}
+body.admin-pc .emo{font-size:44px;}
+body.admin-pc .badge-peach, body.admin-pc .tag{font-size:16px;padding:4px 14px;}
+body.admin-pc .input-box{font-size:24px;padding:18px;}
 .screen{display:none;flex:1;}
 .screen.active{display:flex;flex-direction:column;}
 .card{background:rgba(255,255,255,.92);border:2px solid var(--navy);border-radius:20px;padding:18px;box-shadow:0 4px 0 rgba(47,158,110,.16);}
@@ -1181,6 +1216,10 @@ function escapeHtml(s){
   await POP.init();
   const q = new URLSearchParams(location.search);
   const r = (q.get('role')||'').toLowerCase();
+  // 配信側がPC（幅900px以上）で開いた場合：1080x1920の縦長画角モード
+  if(r==='admin' && window.innerWidth >= 900){
+    document.body.classList.add('admin-pc');
+  }
   if(r==='admin'){ goEntry('admin'); }
   else if(r==='user'){ goEntry('user'); }
 })();
