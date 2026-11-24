@@ -360,7 +360,7 @@ const S = {
   scoringShown:0, scored:{}, // userId -> {speed, acc, score}
   viewIdx:0, adminPhase:null, adminViewKey:null,
   seenRound:0,
-  pollTimer:null, countTimer:null, gameTimer:null,
+  pollTimer:null, countTimer:null, gameTimer:null, userCountTimer:null,
 };
 
 /* ---------- Firebase Realtime Database ラッパ（popo Runtime と同じインターフェース） ----------
@@ -555,8 +555,8 @@ function enterUserWait(){
   pollUser();
 }
 function stopAllTimers(){
-  [S.pollTimer,S.countTimer,S.gameTimer].forEach(t=>{ if(t) clearInterval(t); });
-  S.pollTimer=S.countTimer=S.gameTimer=null;
+  [S.pollTimer,S.countTimer,S.gameTimer,S.userCountTimer].forEach(t=>{ if(t) clearInterval(t); });
+  S.pollTimer=S.countTimer=S.gameTimer=S.userCountTimer=null;
 }
 
 async function pollUser(){
@@ -574,13 +574,23 @@ async function pollUser(){
           const st = document.getElementById('u-sync-state');
           if(phase==='countdown' && round>0){
             const startedMs = new Date(b.data.startedAt).getTime();
-            const remain = Math.max(0, Math.ceil((startedMs - Date.now())/1000));
+            const remain = Math.max(0, Math.ceil((startedMs - POP.now())/1000));
             const cd = document.getElementById('u-countdown');
             if(cd){
               cd.style.display='block';
+              const themeEsc = escapeHtml(b.data.theme||'');
               cd.innerHTML = `<img src="logo-small.png" alt="ロゴ" style="width:90px;margin-bottom:10px;">
                 <div style="font-size:13px;color:var(--navy2);font-weight:700;">ゲームスタートまで</div>
-                <div style="font-size:96px;font-weight:800;color:var(--navy);line-height:1;">${Math.min(remain,10)}</div>`;
+                <div style="font-size:96px;font-weight:800;color:var(--navy);line-height:1;" id="u-count-num">${Math.min(remain,10)}</div>
+                <div class="theme-box" style="margin-top:10px;display:none;"></div>`;
+              // カウントダウンを滑らかに更新（0.25秒間隔・配信側と同じstartedAt基準）
+              if(S.userCountTimer) clearInterval(S.userCountTimer);
+              S.userCountTimer = setInterval(()=>{
+                const r = Math.max(0, Math.ceil((startedMs - POP.now())/1000));
+                const el = document.getElementById('u-count-num');
+                if(!el){ clearInterval(S.userCountTimer); S.userCountTimer=null; return; }
+                el.textContent = Math.min(r,10);
+              }, 250);
             }
             if(st) st.textContent = '';
           } else {
@@ -591,7 +601,7 @@ async function pollUser(){
           // お題開始の判定：phaseがlive、または開始時刻を過ぎたcountdown
           // （配信側のphase更新が失敗しても確実に始まるよう二重の判定にする）
           const started = new Date(b.data.startedAt).getTime();
-          const timeUp = Date.now() >= started;
+          const timeUp = POP.now() >= started;
           // 新しい試合の判定は「startedAt（試合開始時刻）」で行う。
           // Firebase版は board が単一の current スロットで ID が常に同じになるため、
           // ID ではなく startedAt の変化で新しい試合を検知する
@@ -609,7 +619,7 @@ async function pollUser(){
             tlabel.textContent = '経過';
             if(S.gameTimer) clearInterval(S.gameTimer);
             const tickT = ()=>{
-              const el = Math.floor((Date.now() - started)/1000);
+              const el = Math.floor((POP.now() - started)/1000);
               document.getElementById('u-timer-num').textContent = Math.max(0, el);
             };
             tickT();
@@ -830,7 +840,7 @@ async function startGame(){
     round: S.round,
     topicNo: topic.no,
     theme: topic.text,
-    startedAt: new Date(Date.now()+10000).toISOString(), // カウント10秒後に開始
+    startedAt: new Date(POP.now()+10000).toISOString(), // カウント10秒後に開始（サーバー時刻基準）
     scoringShown: 0,
     scores: {}
   });
@@ -852,21 +862,23 @@ async function startGame(){
     }catch(e){ console.warn('theme broadcast failed', e); }
   }
 
-  // カウントダウン演出
-  let n=10;
+  // カウントダウン演出（board.startedAt を唯一の基準にし、サーバー時刻で比較）
+  // → 配信側と参加者側が同じ瞬間に同じ数字を表示する
   const numEl=document.getElementById('a-count-num');
   const themeEl=document.getElementById('a-count-theme');
   themeEl.innerHTML=`<div class="theme-title">${topic.title}（${topic.text.length}文字）</div>${escapeHtml(topic.text)}`;
-  numEl.textContent=n;
-  S.countTimer=setInterval(()=>{
-    n--;
-    if(n<=0){
+  const targetMs = new Date(b.data.startedAt).getTime();
+  const renderCount = ()=>{
+    const remain = Math.max(0, Math.ceil((targetMs - POP.now())/1000));
+    numEl.textContent = Math.min(remain, 10);
+    if(remain <= 0){
       clearInterval(S.countTimer);
-      showAdminLive({data:{theme:topic.text, round:S.round, startedAt:new Date().toISOString()}});
-    } else {
-      numEl.textContent=n;
+      S.countTimer = null;
+      showAdminLive({data:{theme:topic.text, round:S.round, topicNo:topic.no, startedAt:b.data.startedAt}});
     }
-  },1000);
+  };
+  renderCount();
+  S.countTimer = setInterval(renderCount, 250); // 滑らかに更新（0.25秒間隔で検査）
 }
 
 function showAdminLive(b){
@@ -895,7 +907,7 @@ function showAdminLive(b){
   {
     const t0=new Date(b.data.startedAt).getTime();
     S.gameTimer=setInterval(()=>{
-      const el=Math.max(0,Math.floor((Date.now()-t0)/1000));
+      const el=Math.max(0,Math.floor((POP.now()-t0)/1000));
       document.getElementById('a-timer-num').textContent=el;
     },1000);
   }
