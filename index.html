@@ -320,7 +320,7 @@ const ICONS = ['🐒','🐤','🐱','🦊','🐻','🐰'];
 /* ---------- 状態 ---------- */
 const S = {
   role:null, name:'', icon:'',
-  meId:'', boardId:null, seenBoardId:null,
+  meId:'', boardId:null, seenBoardStartedAt:null,
   startedAt:null, sentAt:null,
   scoringShown:0, scored:{}, // userId -> {speed, acc, score}
   viewIdx:0, adminPhase:null, adminViewKey:null,
@@ -502,7 +502,7 @@ async function doEntry(){
     if(POP.hasRuntime){
       try{
         const boards = await POP.find('board', null, [{expression:'created_at DESC'}], 1);
-        if(boards[0]){ S.seenBoardId = String(boards[0].id); }
+        if(boards[0]){ S.seenBoardStartedAt = boards[0].data.startedAt || null; }
       }catch(e){}
     }
     enterUserWait();
@@ -557,11 +557,12 @@ async function pollUser(){
           // （配信側のphase更新が失敗しても確実に始まるよう二重の判定にする）
           const started = new Date(b.data.startedAt).getTime();
           const timeUp = Date.now() >= started;
-          // 新しい試合の判定は「board の ID」で行う（round番号は配信側の再読み込みで
-          // リセットされ同じ1になるため当てにならない）
-          const isNewGame = String(b.id) !== S.seenBoardId;
+          // 新しい試合の判定は「startedAt（試合開始時刻）」で行う。
+          // Firebase版は board が単一の current スロットで ID が常に同じになるため、
+          // ID ではなく startedAt の変化で新しい試合を検知する
+          const isNewGame = b.data.startedAt !== S.seenBoardStartedAt;
           if((phase==='live' || (phase==='countdown' && timeUp)) && isNewGame && round > 0){
-            S.seenBoardId = String(b.id);
+            S.seenBoardStartedAt = b.data.startedAt;
             S.seenRound = round;
             S.sent = false;
             document.getElementById('u-wait').style.display='none';
@@ -835,6 +836,7 @@ async function startGame(){
 
 function showAdminLive(b){
   // board の phase を live に確定（ユーザー側はこの値でお題を受け取る）
+  S.adminPhase = 'live';
   if(S.boardId && POP.hasRuntime){
     POP.update('board', S.boardId, {phase:'live'}).catch(()=>{});
   }
